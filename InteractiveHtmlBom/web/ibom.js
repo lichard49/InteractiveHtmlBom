@@ -647,7 +647,6 @@ function changeCanvasLayout(layout) {
   settings.canvaslayout = layout;
   writeStorage("canvaslayout", layout);
   resizeAll();
-  changeBomMode(settings.bommode);
 }
 
 function populateMetadata() {
@@ -1007,8 +1006,6 @@ window.onload = function(e) {
   cleanGutters();
   populateMetadata();
   dbgdiv = document.getElementById("dbg");
-  bom = document.getElementById("bombody");
-  bomhead = document.getElementById("bomhead");
   filter = "";
   reflookup = "";
   if (!("nets" in pcbdata)) {

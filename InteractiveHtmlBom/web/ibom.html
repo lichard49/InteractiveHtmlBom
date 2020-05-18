@@ -258,7 +258,7 @@
     </div>
   </div>
   <div id="bot" class="split" style="height: calc(100% - 80px)">
-    <div id="bomdiv" class="split split-horizontal">
+    <div id="bomdiv" class="split split-horizontal" style="overflow-x: scroll;">
       <div style="width: 100%">
         <input id="reflookup" class="textbox searchbox reflookup hideonprint" type="text" placeholder="Ref lookup"
                oninput="updateRefLookup(this.value)">
@@ -270,12 +270,7 @@
         </div>
       </div>
       <div id="dbg"></div>
-      <table class="bom">
-        <thead id="bomhead">
-        </thead>
-        <tbody id="bombody">
-        </tbody>
-      </table>
+      <img src="file:///Users/lichard/Projects/boardviz/Arduino_KiCad/arduino_Uno_Rev3-02-TH/kicad_arduino_Uno_Rev3-02-TH/bom/sch.svg">
     </div>
     <div id="canvasdiv" class="split split-horizontal">
       <div id="frontcanvas" class="split" touch-action="none" style="overflow: hidden">

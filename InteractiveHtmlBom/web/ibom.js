@@ -418,6 +418,147 @@ function populateBomHeader() {
   bomhead.appendChild(tr);
 }
 
+var svg;
+var currentlyHighlightedCompId;
+
+const HIGHLIGHT_BORDER = 'rgb(208, 64, 64)';
+const HIGHLIGHT_FILL = 'rgba(208, 64, 64, 0.25)';
+const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+
+// Rough bounding boxes
+// Maps refId to [x1,y1,x2,y2]
+var schematicBoundingBoxDict = {
+  62: [190,113,226,135],    // C1
+  44: [843,144,874,162],    // C2
+  57: [554,215,589,237],    // C3
+  64: [788,326,819,351],    // C4
+  74: [529,365,556,397],    // C5
+  59: [577,487,611,507],    // C6
+  78: [122,512,156,541],    // C7
+  75: [158,527,187,560]     // C8
+};
+
+function test() {
+  svg = document.getElementById('schematic-highlights');
+
+  svg.onclick = (evt) => {
+    var pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    console.log(evt.target);
+    var svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+    console.log(`click in highlight svg at (${svgPt.x},${svgPt.y})`);
+  }
+
+}
+
+function svgRect(x1, y1, x2, y2, id) {
+  var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  var width = x2 - x1;
+  var height = y2 - y1;
+  rect.setAttribute('id', id);
+  rect.setAttributeNS(null, 'x', x1);
+  rect.setAttributeNS(null, 'y', y1);
+  rect.setAttribute('width', width);
+  rect.setAttribute('height', height);
+  rect.setAttribute('fill', TRANSPARENT);
+  rect.setAttribute('stroke', TRANSPARENT);
+  rect.setAttribute('stroke-width', 2);
+  return rect;
+}
+
+function componentClickHandler(id, references) {
+  return function() {
+    if (currentlyHighlightedCompId == id) {
+      // Possibly deselect?
+      return;
+    }
+
+    // console.log(`handler: ${id}, ${references.toString()}`);
+    
+    // TODO remove
+    currentlyHighlightedCompId == id;
+
+    // highlights on board image
+    highlightedModules = references ? references.map(r => r[1]) : [];
+    drawHighlights();
+
+    // highlights on schematic
+    drawSchematicHighlights();
+  }
+}
+
+function drawSchematicHighlights() {
+  for (var component in schematicBoundingBoxDict) {
+    var rect = svg.getElementById('comp-' + component);
+    rect.setAttribute('fill', TRANSPARENT);
+    rect.setAttribute('stroke', TRANSPARENT);
+  }
+  if (highlightedModules.length > 0) {
+    for (var i in highlightedModules) {
+      var refId = highlightedModules[i];
+      if (refId in schematicBoundingBoxDict) {
+        var rect = svg.getElementById('comp-' + refId);
+        rect.setAttribute('fill', HIGHLIGHT_FILL);
+        rect.setAttribute('stroke', HIGHLIGHT_BORDER);
+      }
+    }
+  }
+}
+
+function initSchematicHighlights() {
+  svg = document.getElementById('schematic-highlights');
+  for (var refId in schematicBoundingBoxDict) {
+    var coords = schematicBoundingBoxDict[refId];
+    var rect = svgRect(coords[0], coords[1], coords[2], coords[3], 'comp-' + refId);
+    svg.appendChild(rect);
+  }
+}
+
+function initComponentClickListeners(grouped = false) {
+  moduleIndexToHandler = {};
+
+  var bomTable;
+  switch (settings.canvaslayout) {
+    case 'F':
+      bomTable = pcbdata.bom.F.slice();
+      break;
+    case 'B':
+      bomTable = pcbdata.bom.B.slice();
+      break;
+    default:
+      bomTable = pcbdata.bom.both.slice();
+      break;
+  }
+  if (!grouped) {
+    var expandedTable = []
+      for (var bomEntry of bomTable) {
+        for (var ref of bomEntry[3]) {
+          expandedTable.push([1, bomEntry[1], bomEntry[2], [ref], bomEntry[4], bomEntry[5]]);
+        }
+      }
+      bomTable = expandedTable;
+  }
+
+  for (var i in bomTable) {
+    var bomEntry = bomTable[i];
+    var references = bomEntry[3];
+    var handler = componentClickHandler(i, references);
+
+    if (references !== null) {
+      for (var ref of references) {
+        var refId = ref[1];
+        moduleIndexToHandler[refId] = handler;
+        if (refId in schematicBoundingBoxDict) {
+          var rect = svg.getElementById('comp-' + refId);
+          rect.onclick = handler;
+        }
+      }
+    }
+  }
+}
+
+
 function populateBomBody() {
   while (bom.firstChild) {
     bom.removeChild(bom.firstChild);
@@ -596,13 +737,14 @@ function populateBomTable() {
 }
 
 function modulesClicked(moduleIndexes) {
+  console.log(moduleIndexes)
   var lastClickedIndex = moduleIndexes.indexOf(lastClicked);
   for (var i = 1; i <= moduleIndexes.length; i++) {
     var refIndex = moduleIndexes[(lastClickedIndex + i) % moduleIndexes.length];
     if (refIndex in moduleIndexToHandler) {
       lastClicked = refIndex;
       moduleIndexToHandler[refIndex]();
-      smoothScrollToRow(currentHighlightedRowId);
+      // smoothScrollToRow(currentHighlightedRowId);
       break;
     }
   }
@@ -1014,6 +1156,8 @@ window.onload = function(e) {
   cleanGutters();
   populateMetadata();
   dbgdiv = document.getElementById("dbg");
+  bom = document.getElementById("bombody");
+  bomhead = document.getElementById("bomhead");
   filter = "";
   reflookup = "";
   if (!("nets" in pcbdata)) {
@@ -1029,6 +1173,11 @@ window.onload = function(e) {
     if (!document.fullscreenElement)
       document.getElementById('fullscreenCheckbox').checked = false;
   });
+
+  // test();
+  initSchematicHighlights();
+  // optional: pass settings.bommode === 'ungrouped'
+  initComponentClickListeners();
 }
 
 window.onresize = resizeAll;

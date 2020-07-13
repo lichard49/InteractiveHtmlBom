@@ -8,7 +8,7 @@ echo "Currently here: $INTERACTIVE_BOM_PATH"
 echo "Script is here: $GENERATE_INTERACTIVE_BOM"
 echo "Board is here: $BOARD_PATH"
 
-export PYTHONPATH="/Applications/KiCad/kicad.app/Contents/Frameworks/python/site-packages:/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/site-packages/"
+export PYTHONPATH="/Applications/KiCad/kicad.app/Contents/Frameworks/python/site-packages:/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/site-packages/:/usr/local/lib/python2.7/site-packages/"
 KICAD_PYTHON="/Applications/KiCad/kicad.app/Contents/Frameworks/Python.framework/Versions/2.7/bin"
 echo "Moving to: $KICAD_PYTHON"
 cd $KICAD_PYTHON

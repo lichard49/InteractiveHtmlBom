@@ -725,3 +725,23 @@ a {
 #frontcanvas, #backcanvas {
     touch-action: none;
 }
+
+#schematic {
+  position: relative;
+  width: 100%;
+}
+
+#schematic-img {
+  position: relative;
+  z-index: 4;
+  width: 1000px; /* Ensures fixed image size so that hardcoded svg coords don't break. TODO remove */
+}
+
+#schematic-highlights {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+}

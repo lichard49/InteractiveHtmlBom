@@ -421,66 +421,47 @@ function populateBomHeader() {
 var svg;
 var currentlyHighlightedCompId;
 
-const HIGHLIGHT_BORDER = 'rgb(208, 64, 64)';
-const HIGHLIGHT_FILL = 'rgba(208, 64, 64, 0.25)';
-const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+// Desired elements
+// Z1, RN2, C7, C8, C6, D3
 
-// Rough bounding boxes
-// Maps refId to [x1,y1,x2,y2]
-var schematicBoundingBoxDict = {
-  62: [190,113,226,135],    // C1
-  44: [843,144,874,162],    // C2
-  57: [554,215,589,237],    // C3
-  64: [788,326,819,351],    // C4
-  74: [529,365,556,397],    // C5
-  59: [577,487,611,507],    // C6
-  78: [122,512,156,541],    // C7
-  75: [158,527,187,560]     // C8
-};
-
-function test() {
-  svg = document.getElementById('schematic-highlights');
-
-  svg.onclick = (evt) => {
-    var pt = svg.createSVGPoint();
-    pt.x = evt.clientX;
-    pt.y = evt.clientY;
-    console.log(evt.target);
-    var svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
-    console.log(`click in highlight svg at (${svgPt.x},${svgPt.y})`);
+var schematicComponents = {
+  59: {
+    name: "C6",
+    boxes: [[760,565,802,585]]
+  },
+  66: {
+    name: "Z1",
+    boxes: [[112,522,140,560]]
+  },
+  72: {
+    name: "RN2",
+    boxes: [[700, 80,736,116],
+            [715,650,752,682],
+            [715,600,752,630],
+            [644,510,666,554]]
+  },
+  75: {
+    name: "C8",
+    boxes: [[206,609,246,653]]
+  },
+  78: {
+    name: "C7",
+    boxes: [[162,600,206,627]]
+  },
+  89: {
+    name: "D3",
+    boxes: [[332,376,357,397]]
   }
-
-}
-
-function svgRect(x1, y1, x2, y2, id) {
-  var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  var width = x2 - x1;
-  var height = y2 - y1;
-  rect.setAttribute('id', id);
-  rect.setAttributeNS(null, 'x', x1);
-  rect.setAttributeNS(null, 'y', y1);
-  rect.setAttribute('width', width);
-  rect.setAttribute('height', height);
-  rect.setAttribute('fill', TRANSPARENT);
-  rect.setAttribute('stroke', TRANSPARENT);
-  rect.setAttribute('stroke-width', 2);
-  return rect;
 }
 
 function componentClickHandler(id, references) {
   return function() {
-    if (currentlyHighlightedCompId == id) {
-      // Possibly deselect?
-      return;
-    }
+    highlightedModules = references ? references.map(r => r[1]) : [];
 
-    // console.log(`handler: ${id}, ${references.toString()}`);
-    
-    // TODO remove
-    currentlyHighlightedCompId == id;
+    console.log(references);
+    console.log(highlightedModules);
 
     // highlights on board image
-    highlightedModules = references ? references.map(r => r[1]) : [];
     drawHighlights();
 
     // highlights on schematic
@@ -488,48 +469,23 @@ function componentClickHandler(id, references) {
   }
 }
 
-function drawSchematicHighlights() {
-  for (var component in schematicBoundingBoxDict) {
-    var rect = svg.getElementById('comp-' + component);
-    rect.setAttribute('fill', TRANSPARENT);
-    rect.setAttribute('stroke', TRANSPARENT);
-  }
-  if (highlightedModules.length > 0) {
-    for (var i in highlightedModules) {
-      var refId = highlightedModules[i];
-      if (refId in schematicBoundingBoxDict) {
-        var rect = svg.getElementById('comp-' + refId);
-        rect.setAttribute('fill', HIGHLIGHT_FILL);
-        rect.setAttribute('stroke', HIGHLIGHT_BORDER);
-      }
-    }
-  }
-}
-
-function initSchematicHighlights() {
-  svg = document.getElementById('schematic-highlights');
-  for (var refId in schematicBoundingBoxDict) {
-    var coords = schematicBoundingBoxDict[refId];
-    var rect = svgRect(coords[0], coords[1], coords[2], coords[3], 'comp-' + refId);
-    svg.appendChild(rect);
-  }
-}
-
 function initComponentClickListeners(grouped = false) {
   moduleIndexToHandler = {};
 
   var bomTable;
-  switch (settings.canvaslayout) {
-    case 'F':
-      bomTable = pcbdata.bom.F.slice();
-      break;
-    case 'B':
-      bomTable = pcbdata.bom.B.slice();
-      break;
-    default:
-      bomTable = pcbdata.bom.both.slice();
-      break;
-  }
+  // switch (settings.canvaslayout) {
+  //   case 'F':
+  //     bomTable = pcbdata.bom.F.slice();
+  //     break;
+  //   case 'B':
+  //     bomTable = pcbdata.bom.B.slice();
+  //     break;
+  //   default:
+  //     bomTable = pcbdata.bom.both.slice();
+  //     break;
+  // }
+  bomTable = pcbdata.bom.both.slice(); // disable F/B data
+
   if (!grouped) {
     var expandedTable = []
       for (var bomEntry of bomTable) {
@@ -548,10 +504,9 @@ function initComponentClickListeners(grouped = false) {
     if (references !== null) {
       for (var ref of references) {
         var refId = ref[1];
-        moduleIndexToHandler[refId] = handler;
-        if (refId in schematicBoundingBoxDict) {
-          var rect = svg.getElementById('comp-' + refId);
-          rect.onclick = handler;
+        if (refId in schematicComponents) {
+          // Only enable components that you can click on in the schematic
+          moduleIndexToHandler[refId] = handler;
         }
       }
     }
@@ -1174,9 +1129,6 @@ window.onload = function(e) {
       document.getElementById('fullscreenCheckbox').checked = false;
   });
 
-  // test();
-  initSchematicHighlights();
-  // optional: pass settings.bommode === 'ungrouped'
   initComponentClickListeners();
 }
 

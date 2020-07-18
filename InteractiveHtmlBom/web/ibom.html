@@ -259,7 +259,7 @@
   </div>
   <div id="bot" class="split" style="height: calc(100% - 80px)">
     <div id="bomdiv" class="split split-horizontal" style="overflow-x: scroll;">
-      <div style="width: 100%">
+      <!--<div style="width: 100%">
         <input id="reflookup" class="textbox searchbox reflookup hideonprint" type="text" placeholder="Ref lookup"
                oninput="updateRefLookup(this.value)">
         <input id="filter" class="textbox searchbox filter hideonprint" type="text" placeholder="Filter"
@@ -268,13 +268,11 @@
           <button id="copy" title="Copy bom table to clipboard"
                onclick="copyToClipboard()"></button>
         </div>
-      </div>
-      <div id="dbg"></div>
+      </div>-->
+      <!--<div id="dbg"></div>-->
       <div id="schematic">
-      <!-- /////////////////////////////////////////////// -->
-      ///SCHEMATICDATA///
-      <!-- /////////////////////////////////////////////// -->
-        <svg id="schematic-highlights"></svg>
+        <canvas id="schematic-bg" width="1320px" height="940px"><!-- Dimensions are from SVG --></canvas>
+        <canvas id="schematic-highlight" width="1320px" height="940px"><!-- Dimensions must match--></canvas>
       </div>
       <table class="bom">
         <thead id="bomhead">

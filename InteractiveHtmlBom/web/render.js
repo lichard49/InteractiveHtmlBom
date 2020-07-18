@@ -565,9 +565,16 @@ function recalcLayerScale(layerdict, width, height) {
 }
 
 function redrawCanvas(layerdict) {
-  prepareLayer(layerdict);
-  drawBackground(layerdict);
-  drawHighlightsOnLayer(layerdict);
+  if (layerdict.layer === "S") {
+    // schematic
+    drawSchematic();
+    drawSchematicHighlights();
+  } else {
+    // layout (original)
+    prepareLayer(layerdict);
+    drawBackground(layerdict);
+    drawHighlightsOnLayer(layerdict);
+  }
 }
 
 function resizeCanvas(layerdict) {
@@ -691,6 +698,36 @@ function handlePointerDown(e, layerdict) {
   };
 }
 
+function getMousePos(layerdict, evt) {
+  var canvas = layerdict.bg;
+  var transform = layerdict.transform;
+  var zoomFactor = 1 / transform.zoom;
+
+  var rect = canvas.getBoundingClientRect();  // abs. size of element
+  var scaleX = canvas.width  / rect.width  * zoomFactor;  // relationship bitmap vs. element for X
+  var scaleY = canvas.height / rect.height * zoomFactor;  // relationship bitmap vs. element for Y
+
+  var x = (evt.clientX - rect.left) * scaleX - transform.panx;
+  var y = (evt.clientY - rect.top)  * scaleY - transform.pany;
+
+  // console.log(`canvas coords: (${x}, ${y})`);
+
+  return {
+    x: x,
+    y: y
+  };
+}
+
+function isClickInBoxes(coords, boxes) {
+  for (var i in boxes) {
+    var box = boxes[i];
+    if (box[0] <= coords.x && coords.x <= box[2] && box[1] <= coords.y && coords.y <= box[3]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function handleMouseClick(e, layerdict) {
   if (!e.hasOwnProperty("offsetX")) {
     // The polyfill doesn't set this properly
@@ -698,26 +735,38 @@ function handleMouseClick(e, layerdict) {
     e.offsetY = e.pageY - e.currentTarget.offsetTop;
   }
 
-  var x = e.offsetX;
-  var y = e.offsetY;
-  var t = layerdict.transform;
-  if (layerdict.layer == "B") {
-    x = (devicePixelRatio * x / t.zoom - t.panx + t.x) / -t.s;
-  } else {
-    x = (devicePixelRatio * x / t.zoom - t.panx - t.x) / t.s;
-  }
-  y = (devicePixelRatio * y / t.zoom - t.y - t.pany) / t.s;
-  var v = rotateVector([x, y], -settings.boardRotation);
-  if ("nets" in pcbdata) {
-    var net = netHitScan(layerdict.layer, ...v);
-    if (net !== highlightedNet) {
-      netClicked(net);
+  if (layerdict.layer === "S") {
+    // Use schematic click handler
+    var coords = getMousePos(layerdict, e);
+    for (var refId in schematicComponents) {
+      if (isClickInBoxes(coords, schematicComponents[refId].boxes)) {
+        moduleIndexToHandler[refId]();
+      }
     }
-  }
-  if (highlightedNet === null) {
-    var modules = bboxHitScan(layerdict.layer, ...v);
-    if (modules.length > 0) {
-      modulesClicked(modules);
+    
+  } else {
+    // Use original code
+    var x = e.offsetX;
+    var y = e.offsetY;
+    var t = layerdict.transform;
+    if (layerdict.layer == "B") {
+      x = (devicePixelRatio * x / t.zoom - t.panx + t.x) / -t.s;
+    } else {
+      x = (devicePixelRatio * x / t.zoom - t.panx - t.x) / t.s;
+    }
+    y = (devicePixelRatio * y / t.zoom - t.y - t.pany) / t.s;
+    var v = rotateVector([x, y], -settings.boardRotation);
+    if ("nets" in pcbdata) {
+      var net = netHitScan(layerdict.layer, ...v);
+      if (net !== highlightedNet) {
+        netClicked(net);
+      }
+    }
+    if (highlightedNet === null) {
+      var modules = bboxHitScan(layerdict.layer, ...v);
+      if (modules.length > 0) {
+        modulesClicked(modules);
+      }
     }
   }
 }
@@ -736,7 +785,7 @@ function handlePointerLeave(e, layerdict) {
 function resetTransform(layerdict) {
   layerdict.transform.panx = 0;
   layerdict.transform.pany = 0;
-  layerdict.transform.zoom = 1;
+  layerdict.transform.zoom = layerdict.layer === 'S' ? 2 : 1;
   redrawCanvas(layerdict);
 }
 
@@ -881,9 +930,11 @@ function addMouseHandlers(div, layerdict) {
     handleMouseWheel(e, layerdict);
   }
   for (var element of [div, layerdict.bg, layerdict.fab, layerdict.silk, layerdict.highlight]) {
-    element.addEventListener("contextmenu", function(e) {
-      e.preventDefault();
-    }, false);
+    if (element) {
+      element.addEventListener("contextmenu", function(e) {
+        e.preventDefault();
+      }, false);
+    }
   }
 }
 
@@ -898,6 +949,11 @@ function setBoardRotation(value) {
   document.getElementById("rotationDegree").textContent = settings.boardRotation;
   resizeAll();
 }
+
+var allcanvas;
+var schematicCanvas;
+
+var schematicImg;
 
 function initRender() {
   allcanvas = {
@@ -936,6 +992,80 @@ function initRender() {
       layer: "B",
     }
   };
+
+  // Holds svg of schematic (and possibly the highlights, maybe in layers)
+  schematicCanvas = {
+    transform: {
+      x: 0,
+      y: 0,
+      s: 1,
+      panx: 0,
+      pany: 0,
+      zoom: 2, // Start zoomed in for better aesthetics
+    },
+    pointerStates: {},
+    anotherPointerTapped: false,
+    layer: "S",
+    bg: document.getElementById("schematic-bg"),
+    highlight: document.getElementById("schematic-highlight")
+  }
+
   addMouseHandlers(document.getElementById("frontcanvas"), allcanvas.front);
   addMouseHandlers(document.getElementById("backcanvas"), allcanvas.back);
+
+  addMouseHandlers(document.getElementById("schematic"), schematicCanvas);
+
+  initSchematicCanvas();
+}
+
+function initSchematicCanvas() {
+  var bg = schematicCanvas.bg;
+  var hl = schematicCanvas.highlight;
+
+  var ratio = window.devicePixelRatio || 1;
+
+  schematicImg = new Image();
+
+  // Increase the canvas dimensions by the pixel ratio (display size controlled by CSS)
+  bg.width  *= ratio;
+  bg.height *= ratio;
+  hl.width  *= ratio;
+  hl.height *= ratio;
+
+  schematicImg.onload = function() {
+    drawSchematic();
+  };
+  schematicImg.src = "/Users/tadtiger/Library/Preferences/kicad/scripting/plugins/InteractiveHtmlBom/boards/kicad_arduino_Uno_Rev3-02-TH/bom/sch.svg";
+}
+
+function drawSchematic() {
+  var canvas = schematicCanvas.bg;
+  prepareCanvas(canvas, false, schematicCanvas.transform);
+  clearCanvas(canvas);
+  var ctx = canvas.getContext("2d");
+  ctx.drawImage(schematicImg, 0, 0);
+} 
+
+const HIGHLIGHT_STROKE = 'rgb(208, 64, 64)';
+const HIGHLIGHT_FILL = 'rgba(208, 64, 64, 0.25)';
+
+function drawSchematicHighlights() {
+  var canvas = schematicCanvas.highlight;
+  prepareCanvas(canvas, false, schematicCanvas.transform);
+  clearCanvas(canvas);
+  var ctx = canvas.getContext("2d");
+  if (highlightedModules.length > 0) {
+    for (var i in highlightedModules) {
+      var boxes = schematicComponents[highlightedModules[i]].boxes;
+      for (var j in boxes) {
+        var box = boxes[j];
+        ctx.beginPath();
+        ctx.rect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+        ctx.fillStyle = HIGHLIGHT_FILL;
+        ctx.strokeStyle = HIGHLIGHT_STROKE;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
 }

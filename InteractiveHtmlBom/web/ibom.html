@@ -129,7 +129,7 @@
         </div>
       </div>
       <div class="button-container hideonprint"
-           style="float: right; position: relative; top: 8px">
+           style="float: right; position: relative; top: 8px; display: none"><!-- DISABLED -->
         <button id="fl-btn" class="left-most-button" onclick="changeCanvasLayout('F')"
                 title="Front only">F
         </button>
@@ -142,19 +142,31 @@
       </div>
       <div class="button-container hideonprint"
            style="float: right; position: relative; top: 8px">
-        <button id="bom-btn" class="left-most-button" onclick="changeBomLayout('bom-only')"
-                title="BOM only"></button>
-        <button id="lr-btn" class="middle-button" onclick="changeBomLayout('left-right')"
-                title="BOM left, drawings right"></button>
-        <button id="tb-btn" class="right-most-button" onclick="changeBomLayout('top-bottom')"
-                title="BOM top, drawings bot"></button>
+        <button id="board-btn1" class="left-most-button" onclick="changeBoardMode(1)"
+                title="Highlight component">&bullet;</button>
+        <button id="board-btn2" class="middle-button" onclick="changeBoardMode(2)"
+                title="Circle component"><strong>O</strong></button>
+        <button id="board-btn3" class="middle-button" onclick="changeBoardMode(3)"
+                title="Crosshair on component"><strong>+</strong></button>
+        <button id="board-btn4" class="right-most-button" onclick="changeBoardMode(4)"
+                title="Show layout on component (NOT IMPLEMENTED)"><strong>&#9636;</strong></button>
       </div>
       <div class="button-container hideonprint"
            style="float: right; position: relative; top: 8px">
-        <button id="bom-grouped-btn" class="left-most-button" onclick="changeBomMode('grouped')"
-                title="Grouped BOM"></button>
-        <button id="bom-ungrouped-btn" class="middle-button" onclick="changeBomMode('ungrouped')"
-                title="Ungrouped BOM"></button>
+        <button id="bom-btn" class="left-most-button" onclick="changeBomLayout('bom-only')"
+                title="Fullscreen mode"></button>
+        <button id="lr-btn" class="middle-button" onclick="changeBomLayout('left-right')"
+                title="Side-by-side mode"></button>
+        <button id="tb-btn" class="right-most-button" onclick="changeBomLayout('top-bottom')"
+                title="Peek by inset mode (NOT IMPLEMENTED)"></button>
+      </div>
+      <div class="button-container hideonprint"
+           style="float: right; position: relative; top: 8px">
+        <!-- Button ids retained to keep icons for now -->
+        <button id="bom-grouped-btn" class="left-most-button" onclick="changeDevice(1)"
+                title="Main View"></button>
+        <button id="bom-ungrouped-btn" class="right-most-button" onclick="changeDevice(2)"
+                title="Mobile View"></button>
         <button id="bom-netlist-btn" class="right-most-button" onclick="changeBomMode('netlist')"
                 title="Netlist"></button>
       </div>
@@ -258,6 +270,7 @@
     </div>
   </div>
   <div id="bot" class="split" style="height: calc(100% - 80px)">
+    <div id="swap-icon"><img src="///BOMFILEDIR////swap_icon.png" /></div>
     <div id="bomdiv" class="split split-horizontal" style="overflow-x: scroll;">
       <!--<div style="width: 100%">
         <input id="reflookup" class="textbox searchbox reflookup hideonprint" type="text" placeholder="Ref lookup"
@@ -271,8 +284,8 @@
       </div>-->
       <!--<div id="dbg"></div>-->
       <div id="schematic">
-        <canvas id="schematic-bg" width="1320px" height="940px"><!-- Dimensions are from SVG --></canvas>
-        <canvas id="schematic-highlight" width="1320px" height="940px"><!-- Dimensions must match--></canvas>
+        <canvas id="schematic-bg" width="985px" height="690px"><!-- Dimensions are from SVG --></canvas>
+        <canvas id="schematic-highlight" width="985px" height="690px"><!-- Dimensions must match--></canvas>
       </div>
       <table class="bom">
         <thead id="bomhead">
@@ -298,6 +311,12 @@
           <canvas id="B_hl" style="position: absolute; left: 0; top: 0; z-index: 3;"></canvas>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="bot-mobile" style="height: calc(100% - 80px)">
+    <div id="mobile-canvas">
+      <canvas id="board-bg" width="500px" height="375px"><!-- Dimensions are from SVG --></canvas>
+      <canvas id="board-hl" width="500px" height="375px"><!-- Dimensions must match   --></canvas>
     </div>
   </div>
 </div>

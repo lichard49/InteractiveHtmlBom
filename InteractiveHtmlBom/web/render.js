@@ -2,6 +2,28 @@
 
 var emptyContext2d = document.createElement("canvas").getContext("2d");
 
+
+// ---- BoardViz Globals ---- //
+
+// Hold transform and canvas elements for manipulating layout, schematic, and board
+var allcanvas, schematicCanvas, boardCanvas;
+
+// Highlight colors
+const HIGHLIGHT_STROKE = "rgb(208, 64, 64)";
+const HIGHLIGHT_FILL = "rgba(208, 64, 64, 0.25)";
+const CROSSHAIR_FILL = "rgba(208, 64, 64, 0.5)";
+
+// More highlight consts
+const HL_CIRCLE_RADIUS = 20;
+
+// Attempted linear conversion from layout to board img
+// TODO use two matrices instead (different horizontal and vertical scale needed)
+const LAYOUT_CORNER = {x: 51, y: 107};
+const BOARD_CORNER = {x: 67, y: 28};
+const LB_SCALE = 5.94;
+
+// -------------------------- //
+
 function deg2rad(deg) {
   return deg * Math.PI / 180;
 }
@@ -300,7 +322,7 @@ function drawPad(ctx, pad, color, outline, hole) {
 function drawModule(ctx, layer, scalefactor, module, padcolor, outlinecolor, highlight, outline) {
   if (highlight) {
     // draw bounding box
-    if (module.layer == layer) {
+    if (module.layer == layer || layer == "D") {
       ctx.save();
       ctx.globalAlpha = 0.2;
       ctx.translate(...module.bbox.pos);
@@ -565,10 +587,11 @@ function recalcLayerScale(layerdict, width, height) {
 }
 
 function redrawCanvas(layerdict) {
-  if (layerdict.layer === "S") {
-    // schematic
-    drawSchematic();
+  if (layerdict.layer === "S" || layerdict.layer === "D") {
+    // schematic or board
+    drawCanvasImg(layerdict);
     drawSchematicHighlights();
+    drawBoardHighlights();
   } else {
     // layout (original)
     prepareLayer(layerdict);
@@ -580,7 +603,9 @@ function redrawCanvas(layerdict) {
 function resizeCanvas(layerdict) {
   var canvasdivid = {
     "F": "frontcanvas",
-    "B": "backcanvas"
+    "B": "backcanvas",
+    "S": "schematic",     // not used
+    "D": "mobile-canvas"  // not used
   } [layerdict.layer];
   var width = document.getElementById(canvasdivid).clientWidth * devicePixelRatio;
   var height = document.getElementById(canvasdivid).clientHeight * devicePixelRatio;
@@ -698,6 +723,7 @@ function handlePointerDown(e, layerdict) {
   };
 }
 
+// Gets mouse pos in canvas coords for schematic and board canvas
 function getMousePos(layerdict, evt) {
   var canvas = layerdict.bg;
   var transform = layerdict.transform;
@@ -735,9 +761,10 @@ function handleMouseClick(e, layerdict) {
     e.offsetY = e.pageY - e.currentTarget.offsetTop;
   }
 
-  if (layerdict.layer === "S") {
+  if (layerdict.layer === "S" || layerdict.layer === "D") {
     // Use schematic click handler
     var coords = getMousePos(layerdict, e);
+    console.log(`(${coords.x.toFixed(2)},${coords.y.toFixed(2)})`)
     for (var refId in schematicComponents) {
       if (isClickInBoxes(coords, schematicComponents[refId].boxes)) {
         moduleIndexToHandler[refId]();
@@ -755,6 +782,7 @@ function handleMouseClick(e, layerdict) {
       x = (devicePixelRatio * x / t.zoom - t.panx - t.x) / t.s;
     }
     y = (devicePixelRatio * y / t.zoom - t.y - t.pany) / t.s;
+    console.log(`(${x.toFixed(2)},${y.toFixed(2)})`)
     var v = rotateVector([x, y], -settings.boardRotation);
     if ("nets" in pcbdata) {
       var net = netHitScan(layerdict.layer, ...v);
@@ -785,7 +813,7 @@ function handlePointerLeave(e, layerdict) {
 function resetTransform(layerdict) {
   layerdict.transform.panx = 0;
   layerdict.transform.pany = 0;
-  layerdict.transform.zoom = layerdict.layer === 'S' ? 2 : 1;
+  layerdict.transform.zoom = (layerdict.layer === "S" ? 2 : 1);
   redrawCanvas(layerdict);
 }
 
@@ -904,8 +932,13 @@ function handleMouseWheel(e, layerdict) {
   }
   t.zoom *= m;
   var zoomd = (1 - m) / t.zoom;
-  t.panx += devicePixelRatio * e.offsetX * zoomd;
-  t.pany += devicePixelRatio * e.offsetY * zoomd;
+  // Zoom pans incorrectly for new canvases, TODO fix
+  // console.log(`e.offset: (${e.offsetX},${e.offsetY})`);
+  var x, y;
+  x = e.offsetX;
+  y = e.offsetY;
+  t.panx += devicePixelRatio * x * zoomd;
+  t.pany += devicePixelRatio * y * zoomd;
   redrawCanvas(layerdict);
 }
 
@@ -950,11 +983,6 @@ function setBoardRotation(value) {
   resizeAll();
 }
 
-var allcanvas;
-var schematicCanvas;
-
-var schematicImg;
-
 function initRender() {
   allcanvas = {
     front: {
@@ -993,7 +1021,7 @@ function initRender() {
     }
   };
 
-  // Holds svg of schematic (and possibly the highlights, maybe in layers)
+  // Holds svg of schematic and its highlights
   schematicCanvas = {
     transform: {
       x: 0,
@@ -1007,24 +1035,42 @@ function initRender() {
     anotherPointerTapped: false,
     layer: "S",
     bg: document.getElementById("schematic-bg"),
-    highlight: document.getElementById("schematic-highlight")
+    highlight: document.getElementById("schematic-highlight"),
+    img: new Image()
+  }
+
+  // Holds jpg of board and its highlights
+  boardCanvas = {
+    transform: {
+      x: 0, 
+      y: 0,
+      s: 1,
+      panx: 0,
+      pany: 0,
+      zoom: 2
+    },
+    pointerStates: {},
+    anotherPointerTapped: false,
+    layer: "D",
+    bg: document.getElementById("board-bg"),
+    highlight: document.getElementById("board-hl"),
+    img: new Image()
   }
 
   addMouseHandlers(document.getElementById("frontcanvas"), allcanvas.front);
   addMouseHandlers(document.getElementById("backcanvas"), allcanvas.back);
 
-  addMouseHandlers(document.getElementById("schematic"), schematicCanvas);
-
   initSchematicCanvas();
+  initBoardCanvas();
 }
 
-function initSchematicCanvas() {
-  var bg = schematicCanvas.bg;
-  var hl = schematicCanvas.highlight;
+function initCanvas(wrapper, layerdict) {
+  addMouseHandlers(wrapper, layerdict);
+
+  var bg = layerdict.bg;
+  var hl = layerdict.highlight;
 
   var ratio = window.devicePixelRatio || 1;
-
-  schematicImg = new Image();
 
   // Increase the canvas dimensions by the pixel ratio (display size controlled by CSS)
   bg.width  *= ratio;
@@ -1032,22 +1078,30 @@ function initSchematicCanvas() {
   hl.width  *= ratio;
   hl.height *= ratio;
 
-  schematicImg.onload = function() {
-    drawSchematic();
+  layerdict.img.onload = () => {
+    drawCanvasImg(layerdict);
   };
-  schematicImg.src = "/Users/tadtiger/Library/Preferences/kicad/scripting/plugins/InteractiveHtmlBom/boards/kicad_arduino_Uno_Rev3-02-TH/bom/sch.svg";
 }
 
-function drawSchematic() {
-  var canvas = schematicCanvas.bg;
-  prepareCanvas(canvas, false, schematicCanvas.transform);
-  clearCanvas(canvas);
-  var ctx = canvas.getContext("2d");
-  ctx.drawImage(schematicImg, 0, 0);
-} 
+function initSchematicCanvas() {
+  addMouseHandlers(document.getElementById("schematic"), schematicCanvas);
 
-const HIGHLIGHT_STROKE = 'rgb(208, 64, 64)';
-const HIGHLIGHT_FILL = 'rgba(208, 64, 64, 0.25)';
+  var bg = schematicCanvas.bg;
+  var hl = schematicCanvas.highlight;
+
+  var ratio = window.devicePixelRatio || 1;
+
+  // Increase the canvas dimensions by the pixel ratio (display size controlled by CSS)
+  bg.width  *= ratio;
+  bg.height *= ratio;
+  hl.width  *= ratio;
+  hl.height *= ratio;
+
+  schematicCanvas.img.onload = function() {
+    drawCanvasImg(schematicCanvas);
+  };
+  schematicCanvas.img.src = "///BOMFILEDIR////sch-01.svg";
+}
 
 function drawSchematicHighlights() {
   var canvas = schematicCanvas.highlight;
@@ -1068,4 +1122,105 @@ function drawSchematicHighlights() {
       }
     }
   }
+}
+
+function initBoardCanvas() {
+  addMouseHandlers(document.getElementById("mobile-canvas"), boardCanvas);
+
+  var bg = boardCanvas.bg;
+  var hl = boardCanvas.highlight;
+
+  var ratio = window.devicePixelRatio || 1;
+
+  // Increase the canvas dimensions by the pixel ratio (display size controlled by CSS)
+  // TODO maybe cancel this part
+  bg.width  *= ratio;
+  bg.height *= ratio;
+  hl.width  *= ratio;
+  hl.height *= ratio;
+
+  boardCanvas.img.onload = function() {
+    drawCanvasImg(boardCanvas);
+  };
+  boardCanvas.img.src = "///BOMFILEDIR////arduinouno.jpg";
+}
+
+function drawBoardHighlights() {
+  var canvas = boardCanvas.highlight;
+  prepareCanvas(canvas, false, boardCanvas.transform);
+  clearCanvas(canvas);
+  var ctx = canvas.getContext("2d");
+  if (highlightedModules.length > 0) {
+    for (var i in highlightedModules) {
+      var box = schematicComponents[highlightedModules[i]].boardBox;
+      switch (boardHighlightMode) {
+        case 1:
+          // Just highlight the bounding box
+          drawBoardHighlight(box, ctx, "box");
+          break;
+        case 2:
+          drawBoardHighlight(box, ctx, "box");
+          drawBoardHighlight(box, ctx, "circle");
+          break;
+        case 3:
+          drawBoardHighlight(box, ctx, "box");
+          drawBoardHighlight(box, ctx, "crosshair");
+          break;
+        case 4:
+          console.log("NOT YET IMPLEMENTED");
+          drawBoardHighlight(box, ctx, "box");
+      }
+    }
+  }
+}
+
+function drawBoardHighlight(box, ctx, type) {
+  switch(type) {
+    case "box":
+      ctx.beginPath();
+      ctx.rect(box[0], box[1], box[2]-box[0], box[3]-box[1]);
+      ctx.fillStyle = HIGHLIGHT_FILL;
+      ctx.strokeStyle = HIGHLIGHT_STROKE;
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case "circle":
+      var center = {x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2};
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, HL_CIRCLE_RADIUS, 0, 2 * Math.PI);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = HIGHLIGHT_STROKE;
+      ctx.stroke();
+      break;
+    case "crosshair":
+      // Divided by two because the canvas is currently twice as wide as the board img
+      // TODO figure out how that should be displayed
+      var width = boardCanvas.highlight.width / 2;
+      var height = boardCanvas.highlight.height / 2;
+      var boxW = box[2] - box[0];
+      var boxH = box[3] - box[1];
+
+      ctx.fillStyle = HIGHLIGHT_FILL;
+
+      ctx.fillRect(box[0], 0, boxW, box[1]);
+      ctx.fillRect(0, box[1], box[0], boxH);
+      ctx.fillRect(box[0], box[3], boxW, height - box[3]);
+      ctx.fillRect(box[2], box[1], width - box[2], boxH);
+
+      break;
+  }
+}
+
+function layoutToBoardCoords(x, y, scale = LB_SCALE) {
+  var xb = (x - LAYOUT_CORNER.x) * scale + BOARD_CORNER.x;
+  var yb = (y - LAYOUT_CORNER.y) * scale + BOARD_CORNER.y;
+  return {x: xb, y: yb};
+}
+
+function drawCanvasImg(layerdict) {
+  var canvas = layerdict.bg;
+  prepareCanvas(canvas, false, layerdict.transform);
+  clearCanvas(canvas);
+  canvas.getContext("2d").drawImage(layerdict.img, 0, 0);
 }

@@ -14,6 +14,59 @@ var highlightedModules = [];
 var highlightedNet = null;
 var lastClicked;
 
+
+// ---- BoardViz globals ---- //
+
+// Determines which highlight mode is used on the board
+// 1 = box, 2 = circle, 3 = crosshair, 4 = layout display
+var boardHighlightMode = 1;
+
+// Toggle for which page (schematic or layout) is shown if fullscreen mode is enabled
+var fullscreenShowingSchematic = false;
+
+// NOTE: Display mode (fullscreen, side-by-side, or peek-by-inset) is determined by 
+//       settings.bom-layout (modified existing functionality)
+
+// Prototype elements (hardcoded)
+// Z1, RN2, C7, C8, C6, D3
+var schematicComponents = {
+  59: {
+    name: "C6",
+    boxes: [[570,423,601,438]],
+    boardBox: [224,154,242,162]
+  },
+  66: {
+    name: "Z1",
+    boxes: [[84,393,105,417]],
+    boardBox: [131,105,154,117]
+  },
+  72: {
+    name: "RN2",
+    boxes: [[524, 57,551, 86],
+            [534,486,566,506],
+            [534,452,566,474],
+            [482,387,500,416]],
+    boardBox: [225,100,240,122]
+  },
+  75: {
+    name: "C8",
+    boxes: [[154,460,184,490]],
+    boardBox: [134, 92,150,100]
+  },
+  78: {
+    name: "C7",
+    boxes: [[122,448,154,470]],
+    boardBox: [215,246,223,264]
+  },
+  89: {
+    name: "D3",
+    boxes: [[250,280,270,298]],
+    boardBox: [139,55,150,85]
+  }
+}
+
+// -------------------------- //
+
 function dbg(html) {
   dbgdiv.innerHTML = html;
 }
@@ -418,42 +471,6 @@ function populateBomHeader() {
   bomhead.appendChild(tr);
 }
 
-var svg;
-var currentlyHighlightedCompId;
-
-// Desired elements
-// Z1, RN2, C7, C8, C6, D3
-
-var schematicComponents = {
-  59: {
-    name: "C6",
-    boxes: [[760,565,802,585]]
-  },
-  66: {
-    name: "Z1",
-    boxes: [[112,522,140,560]]
-  },
-  72: {
-    name: "RN2",
-    boxes: [[700, 80,736,116],
-            [715,650,752,682],
-            [715,600,752,630],
-            [644,510,666,554]]
-  },
-  75: {
-    name: "C8",
-    boxes: [[206,609,246,653]]
-  },
-  78: {
-    name: "C7",
-    boxes: [[162,600,206,627]]
-  },
-  89: {
-    name: "D3",
-    boxes: [[332,376,357,397]]
-  }
-}
-
 function componentClickHandler(id, references) {
   return function() {
     highlightedModules = references ? references.map(r => r[1]) : [];
@@ -461,11 +478,14 @@ function componentClickHandler(id, references) {
     console.log(references);
     console.log(highlightedModules);
 
-    // highlights on board image
+    // highlights on layout
     drawHighlights();
 
     // highlights on schematic
     drawSchematicHighlights();
+
+    // highlights on board
+    drawBoardHighlights();
   }
 }
 
@@ -484,7 +504,7 @@ function initComponentClickListeners(grouped = false) {
   //     bomTable = pcbdata.bom.both.slice();
   //     break;
   // }
-  bomTable = pcbdata.bom.both.slice(); // disable F/B data
+  bomTable = pcbdata.bom.both.slice();  // always use full data
 
   if (!grouped) {
     var expandedTable = []
@@ -800,24 +820,75 @@ function populateMetadata() {
     /^v\d+\.\d+/.exec(pcbdata.ibom_version)[0];
 }
 
+function initFullscreenSwapButton() {
+  var swapButton = document.getElementById("swap-icon");
+  swapButton.addEventListener("click", () => {
+    var schematicDiv = document.getElementById("bomdiv");
+    var layoutDiv = document.getElementById("canvasdiv");
+
+    fullscreenShowingSchematic = !fullscreenShowingSchematic;
+    if (fullscreenShowingSchematic) {
+      schematicDiv.style.display = "";
+      layoutDiv.style.display = "none";
+    } else {
+      schematicDiv.style.display = "none";
+      layoutDiv.style.display = "";
+    }
+  });
+}
+
+// Modified to swap between modes
 function changeBomLayout(layout) {
   document.getElementById("bom-btn").classList.remove("depressed");
   document.getElementById("lr-btn").classList.remove("depressed");
   document.getElementById("tb-btn").classList.remove("depressed");
+
+  var schematicDiv = document.getElementById("bomdiv");
+  var layoutDiv = document.getElementById("canvasdiv");
+  var swapButton = document.getElementById("swap-icon");
+
   switch (layout) {
     case 'bom-only':
+      console.log("fullscreen mode");
+
       document.getElementById("bom-btn").classList.add("depressed");
+
+      var bomDiv = document.getElementById("bomdiv");
+      var canvasDiv = document.getElementById("canvasdiv");
+      var frontCanvas = document.getElementById("frontcanvas");
+      var backCanvas = document.getElementById("backcanvas");
+
+      bomDiv.classList.remove("split-horizontal");
+      canvasDiv.classList.remove("split-horizontal");
+      frontCanvas.classList.remove("split-horizontal");
+      backCanvas.classList.remove("split-horizontal");
+      
       if (bomsplit) {
         bomsplit.destroy();
         bomsplit = null;
         canvassplit.destroy();
         canvassplit = null;
       }
-      document.getElementById("frontcanvas").style.display = "none";
-      document.getElementById("backcanvas").style.display = "none";
-      document.getElementById("bot").style.height = "";
+
+      canvasDiv.style.height = "100%";
+      canvasDiv.style.width = "100%";
+      frontCanvas.style.width = "100%";
+      frontCanvas.style.height = "100%";
+      backCanvas.style.width = "100%";
+      backCanvas.style.height = "100%";
+
+      swapButton.style.display = "inherit";
+
       break;
     case 'top-bottom':
+      console.log("peek-by-inset mode (NOT IMPLEMENTED)");
+
+      // TODO
+
+      schematicDiv.style.display = "";
+      layoutDiv.style.display = "";
+      swapButton.style.display = "none";
+
       document.getElementById("tb-btn").classList.add("depressed");
       document.getElementById("frontcanvas").style.display = "";
       document.getElementById("backcanvas").style.display = "";
@@ -845,6 +916,12 @@ function changeBomLayout(layout) {
       });
       break;
     case 'left-right':
+      console.log("side-by-side mode");
+
+      schematicDiv.style.display = "";
+      layoutDiv.style.display = "";
+      swapButton.style.display = "none";
+
       document.getElementById("lr-btn").classList.add("depressed");
       document.getElementById("frontcanvas").style.display = "";
       document.getElementById("backcanvas").style.display = "";
@@ -870,12 +947,48 @@ function changeBomLayout(layout) {
         direction: "vertical",
         onDragEnd: resizeAll
       });
+
+      break;
   }
   settings.bomlayout = layout;
   writeStorage("bomlayout", layout);
   changeCanvasLayout(settings.canvaslayout);
 }
 
+// Replacement for changeBomMode to switch between desktop (layout/schematic) and mobile (board pic)
+function changeDevice(device) {
+  document.getElementById("bom-grouped-btn").classList.remove("depressed");
+  document.getElementById("bom-ungrouped-btn").classList.remove("depressed");
+  if (device == 1) {
+    console.log("default");
+    document.getElementById("bom-grouped-btn").classList.add("depressed");
+    document.getElementById("bot").style.display = "inherit";
+    document.getElementById("bot-mobile").style.display = "none";
+  } else {
+    console.log("mobile");
+    document.getElementById("bom-ungrouped-btn").classList.add("depressed");
+    document.getElementById("bot").style.display = "none";
+    document.getElementById("bot-mobile").style.display = "inherit";
+  }
+}
+
+// Changes the highlighting mode for the board view (mobile)
+function changeBoardMode(mode) {
+  console.log("highlight mode set to " + mode);
+  document.getElementById("board-btn1").classList.remove("depressed");
+  document.getElementById("board-btn2").classList.remove("depressed");
+  document.getElementById("board-btn3").classList.remove("depressed");
+  document.getElementById("board-btn4").classList.remove("depressed");
+
+  document.getElementById("board-btn" + mode).classList.add("depressed");
+
+  boardHighlightMode = mode;
+  if (highlightedModules.length > 0) {
+    drawBoardHighlights();
+  }
+}
+
+// Button listeners have been removed so this function is never called
 function changeBomMode(mode) {
   document.getElementById("bom-grouped-btn").classList.remove("depressed");
   document.getElementById("bom-ungrouped-btn").classList.remove("depressed");
@@ -1130,6 +1243,10 @@ window.onload = function(e) {
   });
 
   initComponentClickListeners();
+  initFullscreenSwapButton();
+
+  // Start in default mode
+  document.getElementById("bom-grouped-btn").classList.add("depressed");
 }
 
 window.onresize = resizeAll;

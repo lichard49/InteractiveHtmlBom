@@ -260,9 +260,11 @@ def generate_file(pcb_file_dir, pcb_file_name, pcbdata, config):
     html = html.replace('///USERHEADER///', get_file_content('userheader.html'))
     html = html.replace('///USERFOOTER///', get_file_content('userfooter.html'))
 
-    #schematic_file_path = os.path.join(bom_file_dir, 'sch.svg')
+    # schematic_file_path = os.path.join(bom_file_dir, 'sch-01.svg')
     #schematic_tag = '<img id="schematic-img" src="' + schematic_file_path + '">'
-    #html = html.replace('///SCHEMATICDATA///', schematic_tag)
+    # html = html.replace('///SCHEMATICDATA///', schematic_file_path)
+
+    html = html.replace('///BOMFILEDIR///', bom_file_dir)
 
     with io.open(bom_file_name, 'wt', encoding='utf-8') as bom:
         bom.write(html)

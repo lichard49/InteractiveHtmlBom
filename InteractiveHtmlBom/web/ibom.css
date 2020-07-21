@@ -746,3 +746,47 @@ div#schematic canvas {
 #schematic-highlight {
   z-index: 2;
 }
+
+#bot {
+  position: relative;
+}
+
+#swap-icon {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  z-index: 10;
+  display: none;
+}
+#swap-icon img {
+  width: 40px;
+}
+
+#bomdiv, #canvasdiv {
+  height: 100%;
+}
+
+/* Mobile stuff */
+#bot-mobile {
+  display: none;
+}
+
+#mobile-canvas {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+#mobile-canvas canvas {
+  position: absolute;
+  width: 100%;
+  top: 0;
+  left: 0;
+}
+
+#board-bg {
+  z-index: 1;
+}
+#board-hl {
+  z-index: 2;
+}
